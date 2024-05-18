@@ -6,11 +6,15 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.rx3.await
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.slf4j.LoggerFactory
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 class SingleRxJavaToCoroutineDeferredUnitTest {
+
+    private val logger = LoggerFactory.getLogger("")
 
     data class Product(val id: Int, val name: String, val price: Double)
 
@@ -66,9 +70,17 @@ class SingleRxJavaToCoroutineDeferredUnitTest {
         val deferred = async {
             suspendCancellableCoroutine { continuation ->
                 getFilteredProducts().subscribe(continuation::resume, continuation::resumeWithException)
+
+                continuation.invokeOnCancellation {
+                    logger.info("Operation was cancelled..")
+                }
             }
         }
-        deferred.assertOver500AndSorted()
+
+        delay(500) // Simulate some delay before cancelling
+        deferred.cancelAndJoin() // Cancel and wait for completion
+
+        assertThrows<CancellationException> { deferred.assertOver500AndSorted() }
     }
 
     @Test
